@@ -1,0 +1,656 @@
+output on;
+//
+//
+//
+// create wallet applet
+// --------------------
+   0x80 0xB8 0x00 0x00 0x14 0x0a 0xa0 0x0 0x0 0x0 0x62 0x3 0x1 0xc 0x6 0x1 0x08 0x0 0x0 0x05 0x01 0x02 0x03 0x04 0x05 0x7F;
+//
+//
+//
+// Select Wallet
+// -------------
+   0x00 0xA4 0x04 0x00 0x0a 0xa0 0x0 0x0 0x0 0x62 0x3 0x1 0xc 0x6 0x1 0x7F;
+//
+//
+//
+// +-----------------------------------------------------------------------------------------+
+// | Teste pentru a demonsta ca nu se executa comenzile fara pin                             |
+// +-----------------------------------------------------------------------------------------+
+//
+//
+//
+// credit 100lei = 0x64
+// --------------------
+//                          ____
+   0x80 0x30 0x00 0x00 0x01 0x64 0x7F;
+//                                                         ^^^^^^^^^^^^^^^^
+// |63 01| = SW_PIN_VERIFICATION_REQUIRED
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+
+// |63 01| = SW_PIN_VERIFICATION_REQUIRED
+// +-----+
+//
+//
+//
+// debit 2 calatorii de autobuz
+// ----------------------------
+// P1: 0x00 = tip autobuz; 
+// P2: 0x02 = 2 calatorii
+//           _________
+   0x80 0x40 0x00 0x02 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+
+// |63 01| = SW_PIN_VERIFICATION_REQUIRED
+// +-----+
+//
+//
+//
+// achizitionare abonament tip autobuz
+// -----------------------------------
+// P1: 0x00 = tip autobuz;
+//           ____
+   0x80 0x70 0x00 0x00 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+
+// |63 01| = SW_PIN_VERIFICATION_REQUIRED
+// +-----+
+//
+//
+//
+// +-----------------------------------------------------------------------------------------+
+// | Comportamentul obisnuit al unui utilizator                                              |
+// +-----------------------------------------------------------------------------------------+
+// |    In cele ce urmeaza se vor achizitiona calatorii fara abonament,                      |
+// |  se va achizitiona un abonament de autobuz si va fi folosit intr-un autobuz,            |
+// |  si se va consuma din balanta cand abonamentul nu este pentru tipul de vehicol folosit  | 
+// |  adica in cazul tramvaiului sau daca abonamentul nu mai are calatorii.                  |
+// |    La final voi achizitiona abonament tip tramvai pentru a se vedea ca se consuma suma  |
+// |  corecta din balanta, apoi voi achizitiona calatorii de tramvai pentru a se vedea ca se |
+// |  foloseste abonamentul, si voi achizitiona calatorii de autobuz pentru a arata ca acolo |
+// |  nu se va aplica bonamentul ci se va consuma din balanta                                |
+// +-----------------------------------------------------------------------------------------+
+//
+//
+//
+// Verify user pin
+// --------------------
+   0x80 0x20 0x00 0x00 0x05 0x01 0x02 0x03 0x04 0x05 0x7F; 
+//
+//
+//
+// credit 100lei = 0x64
+// --------------------
+//                          ____
+   0x80 0x30 0x00 0x00 0x01 0x64 0x7F;
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output: 
+//                  +-----+                 +---+
+// * primii 2 bytes |00 64| sunt balanta de |100| lei,
+//                  +-----+                 +---+
+//                    +-----+                 +-+
+// * ceilalti 2 bytes |00 00| sunt numarul de |0| calatorii din abonament
+//                    +-----+                 +-+
+//
+//
+//
+// debit 2 calatorii de autobuz
+// ----------------------------
+// comanda va consuma din balace deoarece nu avem abonament
+// P1: 0x00 = tip autobuz; 
+// P2: 0x02 = 2 calatorii
+//           _________
+   0x80 0x40 0x00 0x02 0x00 0x7F;
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+
+// * primii 2 bytes |00 60| sunt balanta de |96| lei = 100 - 4 lei (cei 4 lei = 2*2 lei consumati la debitul anterior pentru cele 2 calatorii de autobuz),
+//                  +-----+                 +--+
+//                    +-----+                 +-+
+// * ceilalti 2 bytes |00 00| sunt numarul de |0| calatorii din abonament
+//                    +-----+                 +-+
+//
+//
+//
+// achizitionare abonament tip autobuz
+// -----------------------------------
+// P1: 0x00 = tip autobuz;
+//           ____
+   0x80 0x70 0x00 0x00 0x00 0x7F;
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+
+// * primii 2 bytes |00 42| sunt balanta de |66| lei = 96 - 30 lei (cei 30 lei consumati pentru achizitionarea abonamentului de autobuz),
+//                  +-----+                 +--+
+//                    +-----+                 +--+
+// * ceilalti 2 bytes |00 14| sunt numarul de |20| calatorii din abonament (primite in urma achizitionarii abonamentului de autobuz)
+//                    +-----+                 +--+
+//
+//
+//
+// debit calatorie autobuz
+// -----------------------
+// se va folosi abonamentul de autobuz achizitionat
+// P1: 0x00 = tip autobuz;
+// P2: irelevant, deoarece tranzactia se va face din abonament, parametrul pentru numarul de calatorii este ignorat
+//           ____
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+
+// * primii 2 bytes |00 42| sunt balanta de |66| lei,
+//                  +-----+                 +--+
+//                    +-----+                 +--+
+// * ceilalti 2 bytes |00 13| sunt numarul de |19| calatorii din abonament (1 calatorie a fost consumata in debitul anterior)
+//                    +-----+                 +--+
+//
+//
+//
+// debit 3 calatorii de tramvai
+// ----------------------------
+// comanda va consuma din balance pentru ca abonamentul nu e de tip tramvai
+// P1: 0x01 = tip tramvai; 
+// P2: 0x03 = 3 calatorii
+//           _________
+   0x80 0x40 0x01 0x03 0x00 0x7F;
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+  
+// * primii 2 bytes |00 3f| sunt balanta de |63| lei = 66 - 3 lei ( cei 3 lei = 1 * 3 lei consumati din balanta la debitul anterior deoarece abonamentul nu era de tipul vehiculului cerut),
+//                  +-----+                 +--+
+//                    +-----+                 +--+
+// * ceilalti 2 bytes |00 13| sunt numarul de |19| calatorii din abonament
+//                    +-----+                 +--+
+//
+//
+//
+// golire abonament
+// ----------------
+// voi consuma tot abonamentul pentru a se consuma din balanta odata ce abonamentul nu mai are calatorii
+// prin urmare voi face debit de 19 ori pentru vehicol de tip autobuz
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+
+// * primii 2 bytes |00 3f| sunt balanta de |63| lei,
+//                  +-----+                 +--+
+//                    +-----+                 +-+
+// * ceilalti 2 bytes |00 00| sunt numarul de |0| calatorii din abonament (au fost consumate toate calatoriile din abonament in tranzactiile anterioare)
+//                    +-----+                 +-+
+//
+//
+//
+// debit 4 calatorii de autobuz
+// ----------------------------
+// comanda va consuma din balanta deoarece abonamentul are 0 calatorii
+// P1: 0x00 = tip autobuz; 
+// P2: 0x04 = 4 calatorii
+//           _________
+   0x80 0x40 0x00 0x04 0x00 0x7F;
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+
+// * primii 2 bytes |00 37| sunt balanta de |55| lei = 63 - 8 lei (cei 8 lei = 4 * 2 lei consumati din balanta dupa debitul anterior),
+//                  +-----+                 +--+
+//                    +-----+                 +-+  
+// * ceilalti 2 bytes |00 00| sunt numarul de |0| calatorii din abonament
+//                    +-----+                 +-+
+//
+//
+//
+// achizitionare abonament tip tramvai
+// -----------------------------------
+// P1: 0x01 = tip tramvai;
+//           ____
+   0x80 0x70 0x01 0x00 0x00 0x7F;
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+
+// * primii 2 bytes |00 23| sunt balanta de |35| lei = 55 - 20 lei (cei 20 lei consumati la achizitionarea abonamentului),
+//                  +-----+                 +--+
+//                    +-----+                 +--+
+// * ceilalti 2 bytes |00 1e| sunt numarul de |30| calatorii din abonament (primite in urma achizitionarii acestuia)
+//                    +-----+                 +--+
+//
+//
+//
+// > Utilizarea abonamentului de tramvai intr-un tramvai
+// ---------------------------------------------------
+// se va consuma din abonament
+//
+// debit
+// -----
+// P1: 0x01 = tip tramvai;
+// P2: irelevant, deoarece tranzactia se va face din abonament, parametrul pentru numarul de calatorii este ignorat
+//           ____
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+
+// * primii 2 bytes |00 23| sunt balanta de |35| lei,
+//                  +-----+                 +--+
+//                    +-----+                 +--+
+// * ceilalti 2 bytes |00 1d| sunt numarul de |29| calatorii din abonament (o calatorie a fost consumata in debitul anterior)
+//                    +-----+                 +--+
+//
+//
+//
+// > Utilizarea abonamentului de tramvai intr-un autobuz
+// -----------------------------------------------------
+// se va consuma din lei
+//
+// debit
+// -----
+// P1: 0x00 = tip autobuz;
+// P2: 0x05 = 5 calatorii
+//           _________
+   0x80 0x40 0x00 0x05 0x00 0x7F;
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+
+// * primii 2 bytes |00 19| sunt balanta de |25| lei = 35 - 10 lei (cei 10 lei = 5 * 2 lei consumati la achizitionarea celor 5 calatorii),
+//                  +-----+                 +--+
+//                    +-----+                 +--+
+// * ceilalti 2 bytes |00 1d| sunt numarul de |29| calatorii din abonament
+//                    +-----+                 +--+
+//
+//
+// +-----------------------------------------------------------------------------------------+
+// | Teste pentru cazurile particulare la achizitionarea de abonament                        |
+// +-----------------------------------------------------------------------------------------+
+// |  cazurile particulare pe care le-am testat ar fi:                                       |
+// |   - exista un abonament deja achizitionat                                               |
+// |   - balanta insuficienta                                                                |
+// |   - alt tip de vehicol specificat decat 0x00 (pentru autobuz) si 0x01 (pentru tramvai)  |
+// +-----------------------------------------------------------------------------------------+
+//
+//
+// > Test achizitionare abonament cand exista deja unul achizitionat
+// -----------------------------------------------------------------
+// P1: 0x01 = tip tramvai;
+//           ____
+   0x80 0x70 0x01 0x00 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+
+// |69 85| = SW_CONDITIONS_NOT_SATISFIED
+// +-----+
+//
+//
+// > Test balanta insuficienta la achizitionarea de abonament
+// ----------------------------------------------------------
+//
+//   - golesc mai intai balanta si calatoriile din abonament:
+// ------------------------------------------------------
+//
+//     -- golesc abonamnetul de cele 29 calatorii de tramvai
+// --------------------------------------------------
+//
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+
+// * primii 2 bytes |00 19| sunt balanta de |25| lei,
+//                  +-----+                 +--+
+//                    +-----+                 +-+
+// * ceilalti 2 bytes |00 00| sunt numarul de |0| calatorii din abonament (au fost consumate cu suces toate calatoriile din abonament)
+//                    +-----+                 +-+
+//
+//      -- golsesc balanta de cei 25 lei
+// -----------------------------
+// voi cumpara 10 calatorii de autobuz si apoi 5 de tramvai
+   0x80 0x40 0x00 0x0a 0x00 0x7F;
+   0x80 0x40 0x01 0x05 0x00 0x7F;
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+
+// * primii 2 bytes |00 00| sunt balanta de |00| lei (am golit balanta cu succes),
+//                  +-----+                 +--+
+//                    +-----+                 +-+
+// * ceilalti 2 bytes |00 00| sunt numarul de |0| calatorii din abonament
+//                    +-----+                 +-+
+//
+//     -- incercarea de achizitionare a abonamentului
+// ---------------------------------------
+// P1: 0x00 = tip autobuz;
+//           ____
+   0x80 0x70 0x00 0x00 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+                                                                                           
+// |6a 85| = SW_NEGATIVE_BALANCE
+// +-----+
+//
+//
+//
+// > Test alt tip de vehicol specificat decat 0x00 (pentru autobuz) si 0x01 (pentru tramvai)
+// -----------------------------------------------------------------------------------------
+// P1: 0x05 = un tip invalid de vehicol;
+//           ____
+   0x80 0x70 0x05 0x00 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^                        
+// +-----+                                                                                
+// |69 84| = SW_DATA_INVALID
+// +-----+
+//
+//
+//
+// +-----------------------------------------------------------------------------------------+
+// | Teste pentru cazurile particulare la debit                                              |
+// +-----------------------------------------------------------------------------------------+
+// |  cazurile pariculare pe care le-am testat ar fi:                                        |
+// |   - balanta insuficienta si nici-un abonament achizitionat                              |
+// |   - balanta insuficienta si abonament neaplicabil pe vehicol                            |
+// |   - balanta insuficienta, dar abonament aplicabil pe vehicol                            |
+// |   - alt tip de vehicol specificat decat 0x00 (pentru autobuz) si 0x01 (pentru tramvai)  | 
+// |   - achizitionarea a mai mult de 10 calatorii                                           |
+// |   - un numar mai mic sau egal cu 0 de calatorii cerute prin parametru                   |
+// |   - achizitionarea a 0 calatorii                                                        |
+// |   - achizitionarea unui numar negativ de calatorii                                      |
+// +-----------------------------------------------------------------------------------------+
+//
+//
+//
+// > Test balanta insuficienta si nici-un abonament achizitionat
+// -------------------------------------------------------------
+//
+// debit
+// -------
+// P1: 0x00 = tip autobuz;
+// P2: 0x05 = 5 calatorii
+//           _________
+   0x80 0x40 0x00 0x05 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+
+// |6a 85| = SW_NEGATIVE_BALANCE
+// +-----+
+//
+//
+//
+// > Test balanta insuficienta si abonament neaplicabil pe vehicol 
+// ---------------------------------------------------------------
+// pentru acest test voi credita 20 lei, ii voi folosi la achizitonarea de abonament
+// iar apoi voi face debit in vehicol diferit de tipul abonamentului pentru a primi 
+// eroarea ca balanta nu este suficienta
+//
+//
+//
+// credit 20lei = 0x14
+// ----------------------
+//                          ____
+   0x80 0x30 0x00 0x00 0x01 0x14 0x7F;
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +--+
+// * primii 2 bytes |00 14| sunt balanta de |20| lei,
+//                  +-----+                 +--+
+//                    +-----+                 +-+
+// * ceilalti 2 bytes |00 00| sunt numarul de |0| calatorii din abonament
+//                    +-----+                 +-+
+//
+//
+//
+//  - achizitionare abonament tramvai
+// ----------------------------------
+// P1: 0x01 = tip tramvai;
+//           ____
+   0x80 0x70 0x01 0x00 0x00 0x7F;
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +-+
+// * primii 2 bytes |00 00| sunt balanta de |0| lei (cei 20 lei sau consumat la achizitionarea abonamentului),
+//                  +-----+                 +-+
+//                    +-----+                 +--+
+// * ceilalti 2 bytes |00 1e| sunt numarul de |30| calatorii din abonament
+//                    +-----+                 +--+
+//
+//
+//
+//  debit
+// --------
+// P1: 0x00 = tip autobuz;
+// P2: 0x05 = 5 calatorii
+//           _________
+   0x80 0x40 0x00 0x05 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+
+// |6a 85| = SW_NEGATIVE_BALANCE
+// +-----+
+//
+//
+//
+// > Test balanta insuficienta, dar abonament aplicabil pe vehicol
+// ---------------------------------------------------------------
+// desi blanta este pe 0 se vor folosi calatoriile existente in abonament
+//
+//
+//
+// debit
+// -------
+// P1: 0x01 = tip tramvai;
+// P2: 0x00 = irelevant, deoarece tranzactia se va face din abonament, parametrul pentru numarul de calatorii este ignorat
+//           _________
+   0x80 0x40 0x01 0x00 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+
+// |90 00| = SUCCESS
+// +-----+
+//
+//
+//
+// balance
+// -------
+   0x80 0x50 0x00 0x00 0x00 0x02;
+//                                                     ^^^^^^  ^^^^^^
+// 4 bytes intorsi la output:
+//                  +-----+                 +-+
+// * primii 2 bytes |00 00| sunt balanta de |0| lei (cei 20 lei sau consumat la achizitionarea abonamentului),
+//                  +-----+                 +-+
+//                    +-----+                 +--+
+// * ceilalti 2 bytes |00 1d| sunt numarul de |29| calatorii din abonament (1 calatorie din cele 30 a fost consumata din abonament cu succes)
+//                    +-----+                 +--+
+//
+//
+//
+// > Test alt tip de vehicol specificat decat 0x00 (pentru autobuz) si 0x01 (pentru tramvai)
+// -----------------------------------------------------------------------------------------
+//
+//
+//
+// debit
+// -------
+// P1: 0x05 = un tip invalid de vehicol;
+// P2: 0x03 = 3 calatorii
+//           _________
+   0x80 0x40 0x05 0x03 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+
+// |69 84| = SW_DATA_INVALID
+// +-----+
+//
+//
+//
+// > Test achizitionarea a mai mult de 10 calatorii
+// ------------------------------------------------
+//
+//
+//
+// debit
+// -------
+// P1: 0x00 = tip autobuz;
+// P2: 0x0b = 11 calatorii
+//           _________
+   0x80 0x40 0x00 0x0b 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+
+// |6a 83| = SW_INVALID_TRANSACTION_AMOUNT
+// +-----+
+//
+//
+//
+// > Test achizitionarea a 0 calatorii
+// -----------------------------------
+//
+//
+//
+// debit
+// -------
+// P1: 0x00 = tip autobuz;
+// P2: 0x00 = 0 calatorii
+//           _________
+   0x80 0x40 0x00 0x00 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+
+// |6a 83| = SW_INVALID_TRANSACTION_AMOUNT
+// +-----+
+//
+//
+//
+// > Test achizitionarea unui numar negativ de calatorii
+// -----------------------------------------------------
+//
+//
+//
+// debit
+// -------
+// P1: 0x00 = tip autobuz;
+// P2: 0xFD = -3 calatorii
+//           _________
+   0x80 0x40 0x00 0xFD 0x00 0x7F;
+//                                                     ^^^^^^^^^^^^^^^^
+// +-----+
+// |6a 83| = SW_INVALID_TRANSACTION_AMOUNT
+// +-----+
+//
+//
+//
